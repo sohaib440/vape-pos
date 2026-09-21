@@ -16,6 +16,7 @@ const menuItemSchema = new mongoose.Schema(
     isFavorite: { type: Boolean, default: false },
     perishable: { type: Boolean, default: false },
     kitchenRequired: { type: Boolean, default: true },
+    isBundle: { type: Boolean, default: false },
     recipe: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Recipe",

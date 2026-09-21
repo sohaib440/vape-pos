@@ -9,6 +9,7 @@ import { exportReportPdf } from '@/utils/common/exportReportPdf';
 import { POSFilterBar } from '@/components/pos/POSFilterBar';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { isMenuBundle } from '@/utils/menu/isMenuBundle';
 
 const pieColors = ['hsl(340,70%,21%)', 'hsl(340,60%,30%)', 'hsl(15,45%,81%)', 'hsl(40,70%,55%)', 'hsl(15,25%,13%)'];
 const formatPKR = (value: number) => `Rs. ${value.toLocaleString()}`;
@@ -171,6 +172,7 @@ export default function Reports() {
     revenue: number;
     category?: string;
     description?: string;
+    isBundle?: boolean;
     bundleItems?: Array<{
       menuItem: string | { name: string };
       quantity: number;
@@ -189,7 +191,7 @@ export default function Reports() {
     const expandedMap = new Map<string, { name: string; sold: number; revenue: number; category?: string }>();
 
     (topSellingItems as TopSellingItem[]).forEach(item => {
-      const isBundle = item.category === 'Deals' || item.category === 'Platters';
+      const isBundle = isMenuBundle(item);
       if (isBundle && item.bundleItems?.length) {
         const bundleCount = item.bundleItems.length;
         item.bundleItems.forEach((bi: any) => {

@@ -6,9 +6,10 @@ const {
   getReportingWindowStart,
 } = require("../utils/reportingQueries");
 const { getEffectiveTaxRates } = require("../utils/orderTotals");
+const { isMenuBundle, BUNDLE_MENU_QUERY } = require("../utils/isMenuBundle");
 
 const PAID_ORDER_LIST_PROJECTION =
-  "total subtotal discount advanceAmount serviceCharge gstAmount gstEnabled type paymentMethod items.quantity items.menuItem.price items.menuItem.name items.menuItem.category items.menuItem.description items.menuItem.bundleItems createdAt";
+  "total subtotal discount advanceAmount serviceCharge gstAmount gstEnabled type paymentMethod items.quantity items.menuItem.price items.menuItem.name items.menuItem.category items.menuItem.description items.menuItem.bundleItems items.menuItem.isBundle createdAt";
 
 const getTableNames = async (floorKey) => {
   if (!floorKey || floorKey === "all") return null;
@@ -84,7 +85,7 @@ const normalizeOrderFinancials = (order, rates = { gstRate: 0.16, serviceChargeR
 };
 
 const buildTopMenuItems = async (orders) => {
-  const menuItems = await MenuItem.find({ category: { $in: ["Deals", "Platters"] } }).select("name bundleItems").populate("bundleItems.menuItem", "name").lean();
+  const menuItems = await MenuItem.find(BUNDLE_MENU_QUERY).select("name bundleItems isBundle category").populate("bundleItems.menuItem", "name").lean();
   const menuMap = new Map(menuItems.map(m => [m.name, m.bundleItems]));
 
   const map = new Map();
@@ -97,11 +98,12 @@ const buildTopMenuItems = async (orders) => {
         revenue: 0,
         category: it.menuItem?.category || "",
         description: it.menuItem?.description || "",
-        bundleItems: it.menuItem?.bundleItems || []
+        bundleItems: it.menuItem?.bundleItems || [],
+        isBundle: isMenuBundle(it.menuItem),
       };
       
       // Fallback for old orders or missing bundleItems in snapshot
-      const isBundle = (prev.category === "Deals" || prev.category === "Platters");
+      const isBundle = isMenuBundle(prev);
       const hasIncompleteBundles = prev.bundleItems && prev.bundleItems.length > 0 && prev.bundleItems.some(bi => !bi.name || bi.name === String(bi.menuItem));
       
       if (isBundle && (!prev.bundleItems || prev.bundleItems.length === 0 || hasIncompleteBundles)) {

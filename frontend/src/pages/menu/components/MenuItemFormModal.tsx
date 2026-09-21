@@ -47,7 +47,8 @@ interface MenuItemFormModalProps {
   allCategories: string[];
   categoryTree: Array<{ id: string; name: string; parentId: string | null; isActive: boolean }>;
   categoryOptions: Array<{ id: string; name: string; parentId: string | null; isActive: boolean }>;
-  isBundleCategory: boolean;
+  isBundle: boolean;
+  setIsBundle: (v: boolean) => void;
   bundleItems: BundleEntry[];
   setBundleItems: React.Dispatch<React.SetStateAction<BundleEntry[]>>;
   bundleItemId: string;
@@ -92,7 +93,7 @@ interface MenuItemFormModalProps {
 }
 
 export function MenuItemFormModal({
-  showForm, setShowForm, editing, form, setForm, allCategories, categoryTree, categoryOptions, isBundleCategory,
+  showForm, setShowForm, editing, form, setForm, allCategories, categoryTree, categoryOptions, isBundle, setIsBundle,
   bundleItems, setBundleItems, bundleItemId, setBundleItemId, bundleQty, setBundleQty,
   bundleSourceItems, addBundleItem, selectedRecipeId, setSelectedRecipeId,
   scale, setScale, ingredientOverrides, setIngredientOverrides,
@@ -124,14 +125,14 @@ export function MenuItemFormModal({
   return (
     <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div
-        className={`bg-card rounded-2xl p-6 w-full ${!isBundleCategory ? 'max-w-5xl' : 'max-w-2xl'} space-y-4`}
+        className={`bg-card rounded-2xl p-6 w-full ${!isBundle ? 'max-w-5xl' : 'max-w-2xl'} space-y-4`}
       >
         <div className="flex justify-between items-center">
-          <h3 className="font-serif text-lg font-bold">{editing ? (isBundleCategory ? 'Edit Deal / Platter' : 'Edit Menu Item') : (isBundleCategory ? 'New Deal / Platter' : 'New Menu Item')}</h3>
+          <h3 className="font-serif text-lg font-bold">{editing ? (isBundle ? 'Edit Deal / Platter' : 'Edit Menu Item') : (isBundle ? 'New Deal / Platter' : 'New Menu Item')}</h3>
           <button onClick={() => setShowForm(false)}><X className="w-5 h-5 text-muted-foreground" /></button>
         </div>
 
-        <div className={!isBundleCategory ? 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]' : ''}>
+        <div className={!isBundle ? 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]' : ''}>
           {/* Left column - Menu Item Fields */}
           <div className="space-y-4">
             <input className={inputClass} placeholder="Item name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
@@ -152,7 +153,20 @@ export function MenuItemFormModal({
               {allCategories.filter(category => !categoryOptions.some(option => option.name === category)).map(category => <option key={category} value={category}>{category}</option>)}
             </select>
 
-            {isBundleCategory && (
+            <label className="flex items-start gap-2 text-sm text-muted-foreground cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isBundle}
+                onChange={e => setIsBundle(e.target.checked)}
+                className="accent-primary mt-0.5"
+              />
+              <span>
+                <span className="text-foreground">Multiple items</span>
+                <span className="block text-xs">Check this for a deal, platter, or any combo. The category name does not matter.</span>
+              </span>
+            </label>
+
+            {isBundle && (
               <div className="space-y-2 rounded-xl border border-border p-3">
                 <p className="text-sm font-medium text-foreground">Select items and quantity</p>
                 <div className="grid grid-cols-[1fr_92px_auto] gap-2">
@@ -259,7 +273,7 @@ export function MenuItemFormModal({
           </div>
 
           {/* Right column - Recipe Panel */}
-          {!isBundleCategory && (
+          {!isBundle && (
             <div className="space-y-4 rounded-2xl border border-border bg-muted/20 p-4 lg:self-start">
               <div className="flex items-center justify-between gap-3">
                 <label className="text-sm font-medium text-foreground flex items-center gap-2">
@@ -456,7 +470,7 @@ export function MenuItemFormModal({
         </div>
 
         <button onClick={save} className="w-full bg-primary text-primary-foreground py-2.5 rounded-xl text-sm font-medium hover:bg-secondary transition-colors">
-          {editing ? 'Update' : 'Add'} {isBundleCategory ? 'Deal / Platter' : 'Menu Item'}
+          {editing ? 'Update' : 'Add'} {isBundle ? 'Deal / Platter' : 'Menu Item'}
         </button>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { TrendingUp, DollarSign, ShoppingCart, ArrowUpRight, Filter, XCircle, Pa
 import { api } from '@/lib/api/api';
 import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
+import { isMenuBundle } from '@/utils/menu/isMenuBundle';
 
 const orderTypeDataDefault = [
   { name: 'Dine-in', value: 0, revenue: 0, count: 0 },
@@ -36,7 +37,7 @@ export default function SalesAnalytics() {
           };
           salesDaily: { items: { hour: string; sales: number }[] };
           revenueWeekly: { items: { day: string; revenue: number }[] };
-          topItems: { items: { name: string; sold: number; revenue: number; category?: string; description?: string }[] };
+          topItems: { items: { name: string; sold: number; revenue: number; category?: string; description?: string; isBundle?: boolean; bundleItems?: Array<{ menuItem: string | { name: string }; name?: string; quantity: number }> }[] };
           orderTypeBreakdown: { items: { name: string; value: number; revenue: number; count?: number }[] };
         }>(`/dashboard/bundle?from=${startDate}&to=${endDate}`),
         api<{ items: { month: string; revenue: number }[] }>('/analytics/monthly-trend'),
@@ -80,8 +81,18 @@ export default function SalesAnalytics() {
     const expandedMap = new Map<string, { name: string; sold: number; revenue: number }>();
 
     topSellingItems.forEach(item => {
-      const isBundle = item.category === 'Deals' || item.category === 'Platters';
-      if (isBundle && item.description) {
+      if (isMenuBundle(item) && item.bundleItems?.length) {
+        item.bundleItems.forEach((bi) => {
+          const subName = (bi.name && bi.name !== String(bi.menuItem))
+            ? bi.name
+            : (typeof bi.menuItem === 'object' ? bi.menuItem?.name : bi.menuItem);
+          if (!subName) return;
+          const totalSold = item.sold * (bi.quantity || 1);
+          const existing = expandedMap.get(subName) || { name: subName, sold: 0, revenue: 0 };
+          existing.sold += totalSold;
+          expandedMap.set(subName, existing);
+        });
+      } else if (isMenuBundle(item) && item.description) {
         const parts = item.description.split(',').map(p => p.trim()).filter(Boolean);
         parts.forEach(part => {
           const match = part.match(/^(.*)\s+(\d+)$/);
