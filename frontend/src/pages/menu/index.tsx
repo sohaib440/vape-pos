@@ -7,6 +7,7 @@ import { api, type PaginatedResponse } from '@/lib/api/api';
 import { usePosRealtimeScopes } from '@/hooks/pos/use-pos-realtime';
 import { MenuItemFormModal } from './components/MenuItemFormModal';
 import { MenuItemsTable } from './components/MenuItemsTable';
+import { isMenuBundle } from '@/utils/menu/isMenuBundle';
 
 type MenuCategory = {
   id: string;
@@ -146,7 +147,7 @@ export default function MenuManagement() {
   usePosRealtimeScopes(['menu'], refreshMenuAdmin);
 
   const [editing, setEditing] = useState<MenuItem | null>(null);
-  const [editingIsBundle, setEditingIsBundle] = useState(false);
+  const [isBundle, setIsBundle] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', price: '', category: 'BBQ', categoryId: '', parentCategoryId: '', description: '', kitchenRequired: true, image: '', isFavorite: false });
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
@@ -173,11 +174,8 @@ export default function MenuManagement() {
 
   const allCategories = Array.from(new Set([...categories.map(category => category.name), ...DEFAULT_SPECIAL_CATEGORIES]));
   const childCategories = categories.filter(category => Boolean(category.parentId) && category.isActive);
-  const isBundleCategory = editing ? editingIsBundle : (form.category === 'Deals' || form.category === 'Platters');
   const bundleSourceItems = useMemo(
-    () => allMenuItems.filter(
-      (i) => i.id !== editing?.id && i.category && !['deals', 'platters'].includes(i.category.toLowerCase())
-    ),
+    () => allMenuItems.filter((i) => i.id !== editing?.id && !isMenuBundle(i)),
     [allMenuItems, editing?.id]
   );
   const selectedRecipe = useMemo(
@@ -240,14 +238,11 @@ export default function MenuManagement() {
       .slice(0, 8);
   }, [inventoryItems, mergedRecipeIngredients, overrideIngredientSearch, selectedRecipe]);
 
-  const openNew = (preferredCategory?: string) => {
+  const openNew = (asBundle = false) => {
     cleanupImagePreview();
     setImageFile(null);
     setImagePreviewUrl('');
-    const fallbackCategory = allCategories[0] || 'Deals';
-    const category = preferredCategory || fallbackCategory;
-    const preferred = childCategories.find((item) => item.name === category);
-    setForm({ name: '', price: '', category, categoryId: preferred?.id || '', parentCategoryId: preferred?.parentId || '', description: '', kitchenRequired: true, image: '', isFavorite: false });
+    setForm({ name: '', price: '', category: '', categoryId: '', parentCategoryId: '', description: '', kitchenRequired: true, image: '', isFavorite: false });
     setBundleItems([]);
     setBundleItemId('');
     setBundleQty('1');
@@ -261,7 +256,7 @@ export default function MenuManagement() {
     setIngredientSearch('');
     setOverrideIngredientSearch('');
     setEditing(null);
-    setEditingIsBundle(false);
+    setIsBundle(asBundle);
     setShowForm(true);
   };
 
@@ -280,7 +275,7 @@ export default function MenuManagement() {
       image: item.image || '',
       isFavorite: item.isFavorite || false
     });
-    if (item.category === 'Deals' || item.category === 'Platters') {
+    if (isMenuBundle(item)) {
       if (item.bundleItems && item.bundleItems.length > 0) {
         setBundleItems(item.bundleItems.map(bi => {
           const menuItemId = typeof bi.menuItem === 'string'
@@ -300,7 +295,7 @@ export default function MenuManagement() {
           };
         }));
       } else {
-        const sourceItems = allMenuItems.filter(i => i.id !== item.id && i.category && !['deals', 'platters'].includes(i.category.toLowerCase()));
+        const sourceItems = allMenuItems.filter(i => i.id !== item.id && !isMenuBundle(i));
         setBundleItems(parseBundleItemsFromDescription(item.description || '', sourceItems));
       }
     } else {
@@ -320,7 +315,7 @@ export default function MenuManagement() {
     setNewRecipeName('');
     setNewRecipeIngredients([]);
     setOverrideIngredientSearch('');
-    setEditingIsBundle(item.category === 'Deals' || item.category === 'Platters');
+    setIsBundle(isMenuBundle(item));
     setEditing(item);
     setShowForm(true);
   };
@@ -341,11 +336,11 @@ export default function MenuManagement() {
 
   const save = () => {
     if (!form.name || !form.price) return;
-    if (isBundleCategory && bundleItems.length === 0) {
+    if (isBundle && bundleItems.length === 0) {
       toast.error('Add at least one item for this deal/platter');
       return;
     }
-    if (!isBundleCategory && !form.categoryId && !form.category) {
+    if (!form.categoryId && !form.category) {
       toast.error('Select a category for this menu item');
       return;
     }
@@ -353,16 +348,19 @@ export default function MenuManagement() {
     formData.append('name', form.name);
     formData.append('price', form.price);
     formData.append('category', form.category);
+    if (form.categoryId) formData.append('categoryId', form.categoryId);
     formData.append('description', form.description);
     formData.append('kitchenRequired', String(form.kitchenRequired));
     formData.append('isFavorite', String(form.isFavorite));
+    formData.append('isBundle', String(isBundle));
     formData.append('image', form.image || '');
-    if (isBundleCategory) {
+    if (isBundle) {
       formData.append('bundleItems', JSON.stringify(bundleItems.map(bi => ({
         menuItem: bi.id,
         quantity: bi.quantity
       }))));
     } else {
+      formData.append('bundleItems', JSON.stringify([]));
       formData.append('recipe', selectedRecipeId || '');
       formData.append('scale', scale);
       formData.append('ingredientOverrides', JSON.stringify(ingredientOverrides));
@@ -384,18 +382,19 @@ export default function MenuManagement() {
   };
 
   useEffect(() => {
-    if (!isBundleCategory) return;
+    if (!isBundle) return;
     const description = bundleItems.map(entry => `${entry.name} ${entry.quantity}`).join(', ');
     setForm(prev => ({ ...prev, description }));
-  }, [isBundleCategory, bundleItems]);
+  }, [isBundle, bundleItems]);
 
-  useEffect(() => {
-    if (!isBundleCategory) {
+  const handleSetIsBundle = (value: boolean) => {
+    setIsBundle(value);
+    if (!value) {
       setBundleItems([]);
       setBundleItemId('');
       setBundleQty('1');
     }
-  }, [isBundleCategory]);
+  };
 
   const saveRecipe = () => {
     if (!newRecipeName.trim()) { toast.error('Enter recipe name'); return; }
@@ -475,10 +474,10 @@ export default function MenuManagement() {
             <p className="text-sm text-muted-foreground">One search for names, descriptions, and categories. Use the list to show one category only.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <button onClick={() => openNew('Deals')} className="bg-secondary text-secondary-foreground px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-1.5 hover:bg-secondary/90 transition-colors">
+            <button onClick={() => openNew(true)} className="bg-secondary text-secondary-foreground px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-1.5 hover:bg-secondary/90 transition-colors">
               <Plus className="w-4 h-4" /> Add Deal/Platter
             </button>
-            <button onClick={() => openNew()} className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-1.5 hover:bg-secondary transition-colors">
+            <button onClick={() => openNew(false)} className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-1.5 hover:bg-secondary transition-colors">
               <Plus className="w-4 h-4" /> Add Item
             </button>
           </div>
@@ -519,7 +518,8 @@ export default function MenuManagement() {
         allCategories={allCategories}
         categoryTree={categoryTree}
         categoryOptions={childCategories}
-        isBundleCategory={isBundleCategory}
+        isBundle={isBundle}
+        setIsBundle={handleSetIsBundle}
         bundleItems={bundleItems}
         setBundleItems={setBundleItems}
         bundleItemId={bundleItemId}

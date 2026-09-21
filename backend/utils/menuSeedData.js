@@ -117,6 +117,7 @@ const MENU_ITEMS = [
     available: true, 
     perishable: true, 
     kitchenRequired: true,
+    isBundle: true,
     bundleItems: [
       { menuItemName: "Chicken White Karahi", quantity: 0.5 },
       { menuItemName: "Full Chicken Roast", quantity: 1 },
@@ -136,6 +137,7 @@ const MENU_ITEMS = [
     available: true, 
     perishable: true, 
     kitchenRequired: true,
+    isBundle: true,
     bundleItems: [
       { menuItemName: "Kabli Pulao", quantity: 1 },
       { menuItemName: "Chicken Piece", quantity: 1 },
@@ -152,6 +154,7 @@ const MENU_ITEMS = [
     available: true, 
     perishable: true, 
     kitchenRequired: true,
+    isBundle: true,
     bundleItems: [
       { menuItemName: "Chicken White Handi", quantity: 0.5 },
       { menuItemName: "Chicken Reshmi Kabab 4PC", quantity: 0.5 },
@@ -170,6 +173,7 @@ const MENU_ITEMS = [
     available: true, 
     perishable: true, 
     kitchenRequired: true,
+    isBundle: true,
     bundleItems: [
       { menuItemName: "Mutton Leg Roast", quantity: 1 },
       { menuItemName: "Chicken Kabab 4PC", quantity: 1 },
@@ -193,6 +197,7 @@ const MENU_ITEMS = [
     available: true, 
     perishable: true, 
     kitchenRequired: true,
+    isBundle: true,
     bundleItems: [
       { menuItemName: "Mutton Leg Roast", quantity: 0.5 },
       { menuItemName: "Chicken Kabab 4PC", quantity: 0.5 },
@@ -211,6 +216,7 @@ const MENU_ITEMS = [
     available: true, 
     perishable: true, 
     kitchenRequired: true,
+    isBundle: true,
     bundleItems: [
       { menuItemName: "Full Chicken Roast", quantity: 1 },
       { menuItemName: "Chicken Boti with Bone 12PC", quantity: 0.5 },
@@ -229,6 +235,7 @@ const MENU_ITEMS = [
     available: true, 
     perishable: true, 
     kitchenRequired: true,
+    isBundle: true,
     bundleItems: [
       { menuItemName: "Half Chicken Roast", quantity: 1 },
       { menuItemName: "Chicken Boti with Bone 12PC", quantity: 0.25 },
@@ -247,6 +254,7 @@ const MENU_ITEMS = [
     available: true, 
     perishable: true, 
     kitchenRequired: true,
+    isBundle: true,
     bundleItems: [
       { menuItemName: "Chicken Kabab 4PC", quantity: 1 },
       { menuItemName: "Beef Kabab 4PC", quantity: 1 },
@@ -269,6 +277,7 @@ const MENU_ITEMS = [
     available: true, 
     perishable: true, 
     kitchenRequired: true,
+    isBundle: true,
     bundleItems: [
       { menuItemName: "Chicken Kabab 4PC", quantity: 0.5 },
       { menuItemName: "Beef Kabab 4PC", quantity: 0.5 },

@@ -139,7 +139,8 @@ const stampItemsForKitchen = (items, requestId, requestAt = new Date()) => {
       menuItem: {
         ...(item.menuItem || {}),
         kitchenRequired: item.menuItem?.kitchenRequired !== false,
-        bundleItems
+        isBundle: item.menuItem?.isBundle === true || bundleItems.length > 0,
+        bundleItems,
       },
       requestId,
       requestAt,

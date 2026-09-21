@@ -1,6 +1,7 @@
 import { type MenuItem } from '@/data/pos/mockData';
 import { resolveUploadUrl } from '@/lib/api/api';
 import { Pencil, Trash2 } from 'lucide-react';
+import { isMenuBundle } from '@/utils/menu/isMenuBundle';
 
 interface MenuItemsTableProps {
   items: MenuItem[];
@@ -55,7 +56,12 @@ export function MenuItemsTable({
                       <div className="h-12 w-12 rounded-lg bg-muted" />
                     )}
                     <div className="min-w-0">
-                      <p className="font-medium text-foreground truncate">{item.name}</p>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="font-medium text-foreground truncate">{item.name}</p>
+                        {isMenuBundle(item) ? (
+                          <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary/20 text-secondary-foreground">Combo</span>
+                        ) : null}
+                      </div>
                       <p className="text-xs text-muted-foreground line-clamp-1">{item.description}</p>
                     </div>
                   </div>

@@ -1,5 +1,6 @@
 const { Order, Delivery, MenuItem, Table, Recipe, InventoryItem } = require("../models");
 const { buildPaidOrdersQuery, parseCustomDateRange } = require("../utils/reportingQueries");
+const { isMenuBundle, BUNDLE_MENU_QUERY } = require("../utils/isMenuBundle");
 
 const sumOrderTotal = (order) => Number(order.total || 0);
 
@@ -127,7 +128,7 @@ exports.topItems = async (req, res) => {
   const tableNames = await getTableNames(req.query.floorKey);
   const orders = await Order.find(buildPaidOrdersQuery(req.query.range, req.query.from, req.query.to, tableNames, req.query.orderTaker)).lean();
 
-  const menuItems = await MenuItem.find({ category: { $in: ["Deals", "Platters"] } }).select("name bundleItems").populate("bundleItems.menuItem", "name").lean();
+  const menuItems = await MenuItem.find(BUNDLE_MENU_QUERY).select("name bundleItems isBundle category").populate("bundleItems.menuItem", "name").lean();
   const menuMap = new Map(menuItems.map(m => [m.name, m.bundleItems]));
 
   const map = new Map();
@@ -140,10 +141,11 @@ exports.topItems = async (req, res) => {
         revenue: 0, 
         description: i.menuItem?.description || "", 
         category: i.menuItem?.category || "",
-        bundleItems: i.menuItem?.bundleItems || []
+        bundleItems: i.menuItem?.bundleItems || [],
+        isBundle: isMenuBundle(i.menuItem),
       };
 
-      const isBundle = (prev.category === "Deals" || prev.category === "Platters");
+      const isBundle = isMenuBundle(prev);
       const hasIncompleteBundles = prev.bundleItems && prev.bundleItems.length > 0 && prev.bundleItems.some(bi => !bi.name || bi.name === String(bi.menuItem));
 
       if (isBundle && (!prev.bundleItems || prev.bundleItems.length === 0 || hasIncompleteBundles)) {

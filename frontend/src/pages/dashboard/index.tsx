@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { formatOrderDateTime, groupOrdersByCalendarDay } from '@/utils/common/formatOrderDateTime';
 import { POSFilterBar } from '@/components/pos/POSFilterBar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { isMenuBundle } from '@/utils/menu/isMenuBundle';
 
 type RecentOrderRow = { id: string; type: string; status: string; items: unknown[]; total: number; createdAt: string };
 type TopSellingItem = {
@@ -14,6 +15,7 @@ type TopSellingItem = {
   sold: number;
   revenue: number;
   category?: string;
+  isBundle?: boolean;
   bundleItems?: Array<{
     menuItem: string | { name: string };
     quantity: number;
@@ -131,7 +133,7 @@ export default function POSDashboard() {
 
     const map = new Map<string, { sold: number; revenue: number; category?: string }>();
     topSellingItems.forEach((item) => {
-      if ((item.category === 'Platters' || item.category === 'Deals') && item.bundleItems?.length) {
+      if (isMenuBundle(item) && item.bundleItems?.length) {
         const bundleCount = item.bundleItems.length;
         item.bundleItems.forEach((bi: any) => {
           const subName = (bi.name && bi.name !== String(bi.menuItem))

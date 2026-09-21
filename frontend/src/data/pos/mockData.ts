@@ -11,6 +11,7 @@ export interface MenuItem {
   perishable: boolean;
   kitchenRequired?: boolean;
   expiryDays?: number;
+  isBundle?: boolean;
   bundleItems?: Array<{ menuItem: string; quantity: number }>;
 }
 
