@@ -248,6 +248,22 @@ export default function Reports() {
     return items;
   }, [childCategories, menuSearch, parsedTopSellingItems, selectedCategory, selectedChildCategory, selectedParentCategory]);
 
+  const filteredSalesTotal = useMemo(
+    () => filteredTopSellingItems.reduce(
+      (acc, item) => ({ sold: acc.sold + item.sold, revenue: acc.revenue + item.revenue }),
+      { sold: 0, revenue: 0 }
+    ),
+    [filteredTopSellingItems]
+  );
+
+  const selectedSalesLabel = selectedChildCategory !== 'all'
+    ? (childCategories.find(category => category.id === selectedChildCategory)?.name || 'Category')
+    : selectedParentCategory !== 'all'
+      ? (selectedParent?.name || 'Category')
+      : selectedCategory !== 'all'
+        ? selectedCategory
+        : 'All categories';
+
   const filteredInventoryUsage = useMemo(() =>
     inventoryUsage.filter(item =>
       item.inventoryItemName.toLowerCase().includes(inventorySearch.toLowerCase())
@@ -660,7 +676,10 @@ export default function Reports() {
         <div className="pos-card no-print">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
             <div className="flex items-center gap-3">
-              <h3 className="font-semibold text-foreground text-sm">Menu Items Sales</h3>
+              <div>
+                <h3 className="font-semibold text-foreground text-sm">Menu Items Sales</h3>
+                <p className="text-[11px] text-muted-foreground">{selectedSalesLabel} · {filteredTopSellingItems.length} items · {filteredSalesTotal.sold.toLocaleString()} sold · {formatPKR(filteredSalesTotal.revenue)}</p>
+              </div>
               <button
                 onClick={() => setExpandBundles(!expandBundles)}
                 className={`text-[10px] uppercase font-black px-2 py-1 rounded-md transition-all ${
@@ -729,6 +748,15 @@ export default function Reports() {
                   </tr>
                 )}
               </tbody>
+              {filteredTopSellingItems.length > 0 && (
+                <tfoot>
+                  <tr className="border-t border-border bg-muted/40">
+                    <td className="py-3 px-2 font-semibold text-foreground" colSpan={3}>{selectedSalesLabel} total</td>
+                    <td className="py-3 px-2 font-semibold text-foreground">{filteredSalesTotal.sold.toLocaleString()}</td>
+                    <td className="py-3 px-2 font-semibold text-foreground">{formatPKR(filteredSalesTotal.revenue)}</td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </div>

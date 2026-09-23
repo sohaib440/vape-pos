@@ -193,6 +193,22 @@ export default function POSDashboard() {
     return items;
   }, [childCategories, expandedTopItems, selectedCategory, selectedChildCategory, selectedParentCategory]);
 
+  const filteredSalesTotal = useMemo(
+    () => filteredTopItems.reduce(
+      (acc, item) => ({ sold: acc.sold + item.sold, revenue: acc.revenue + item.revenue }),
+      { sold: 0, revenue: 0 }
+    ),
+    [filteredTopItems]
+  );
+
+  const selectedSalesLabel = selectedChildCategory !== 'all'
+    ? (childCategories.find(category => category.id === selectedChildCategory)?.name || 'Category')
+    : selectedParentCategory !== 'all'
+      ? (selectedParent?.name || 'Category')
+      : selectedCategory !== 'all'
+        ? selectedCategory
+        : 'All categories';
+
   const { dineIn, delivery, takeaway } = useMemo(
     () => ({
       dineIn: sampleOrders.filter((o) => o.type === 'dine-in').length,
@@ -383,6 +399,13 @@ export default function POSDashboard() {
                   {expandBundles ? 'Bundles Expanded' : 'Expand Bundles'}
                 </button>
               </div>
+            </div>
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 px-3 py-2.5 shrink-0">
+              <div>
+                <p className="text-[11px] text-muted-foreground">{selectedSalesLabel} total</p>
+                <p className="text-xs text-muted-foreground">{filteredTopItems.length} items · {filteredSalesTotal.sold.toLocaleString()} sold</p>
+              </div>
+              <p className="font-serif text-xl font-bold text-foreground">{formatPKR(filteredSalesTotal.revenue)}</p>
             </div>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1 max-h-[28rem] scrollbar-thin lg:max-h-[32rem]">
               {filteredTopItems.map((item, i) => (
