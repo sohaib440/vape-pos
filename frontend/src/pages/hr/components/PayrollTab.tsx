@@ -471,7 +471,7 @@ export function PayrollTab({ employees }: { employees: Employee[] }) {
 
       {payDialog && (
         <div className="fixed inset-0 bg-foreground/30 flex items-center justify-center z-50 p-4" onClick={() => { setPayDialog(null); setPayHistory(null); }}>
-          <div className="bg-card rounded-2xl p-6 w-full max-w-md space-y-3" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-card rounded-2xl p-6 w-full max-w-3xl space-y-3" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-serif text-lg font-bold text-foreground">Record payment — {payEmployeeName}</h3>
             <div className={`rounded-xl border px-3 py-2.5 ${selectedStatus === 'paid' ? 'border-primary/30 bg-primary/5' : selectedStatus === 'partial' ? 'border-warning/30 bg-warning/5' : 'border-destructive/30 bg-destructive/5'}`}>
               <p className={`text-sm font-semibold ${selectedStatus === 'paid' ? 'text-primary' : selectedStatus === 'partial' ? 'text-warning' : 'text-destructive'}`}>
