@@ -676,10 +676,7 @@ export default function Reports() {
         <div className="pos-card no-print">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
             <div className="flex items-center gap-3">
-              <div>
-                <h3 className="font-semibold text-foreground text-sm">Menu Items Sales</h3>
-                <p className="text-[11px] text-muted-foreground">{selectedSalesLabel} · {filteredTopSellingItems.length} items · {filteredSalesTotal.sold.toLocaleString()} sold · {formatPKR(filteredSalesTotal.revenue)}</p>
-              </div>
+              <h3 className="font-semibold text-foreground text-sm">Menu Items Sales</h3>
               <button
                 onClick={() => setExpandBundles(!expandBundles)}
                 className={`text-[10px] uppercase font-black px-2 py-1 rounded-md transition-all ${
@@ -719,6 +716,13 @@ export default function Reports() {
               </div>
             </div>
           </div>
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 px-3 py-2.5">
+            <div>
+              <p className="text-[11px] text-muted-foreground">{selectedSalesLabel} total</p>
+              <p className="text-xs text-muted-foreground">{filteredTopSellingItems.length} items · {filteredSalesTotal.sold.toLocaleString()} sold</p>
+            </div>
+            <p className="font-serif text-xl font-bold text-foreground">{formatPKR(filteredSalesTotal.revenue)}</p>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -753,7 +757,7 @@ export default function Reports() {
                   <tr className="border-t border-border bg-muted/40">
                     <td className="py-3 px-2 font-semibold text-foreground" colSpan={3}>{selectedSalesLabel} total</td>
                     <td className="py-3 px-2 font-semibold text-foreground">{filteredSalesTotal.sold.toLocaleString()}</td>
-                    <td className="py-3 px-2 font-semibold text-foreground">{formatPKR(filteredSalesTotal.revenue)}</td>
+                    <td className="py-3 px-2 font-serif text-lg font-bold text-foreground">{formatPKR(filteredSalesTotal.revenue)}</td>
                   </tr>
                 </tfoot>
               )}
