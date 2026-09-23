@@ -24,7 +24,10 @@ router.get("/leaves", authRequired, hrController.listLeaves);
 router.patch("/leaves/:id/status", authRequired, hrController.patchLeaveStatus);
 router.get("/leave-balances", authRequired, hrController.listLeaveBalances);
 router.get("/salary", authRequired, hrController.listSalary);
+router.get("/salary/payments", authRequired, hrController.listSalaryPayments);
+router.get("/salary/:employeeId/history", authRequired, hrController.listSalaryHistory);
 router.patch("/salary/:employeeId", authRequired, hrController.patchSalary);
+router.post("/salary/:employeeId/payments", authRequired, hrController.recordSalaryPayment);
 router.patch("/salary/:employeeId/mark-paid", authRequired, hrController.markSalaryPaid);
 router.get("/shifts", authRequired, hrController.listShifts);
 

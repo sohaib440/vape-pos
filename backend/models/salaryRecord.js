@@ -9,14 +9,13 @@ const salaryRecordSchema = new mongoose.Schema(
     deductions: Number,
     lateFines: Number,
     netSalary: Number,
-    status: String,
+    status: { type: String, enum: ["pending", "partial", "paid"], default: "pending" },
     paidOn: String,
   },
   { timestamps: true }
 );
 
-// Performance Indexes
-salaryRecordSchema.index({ employeeId: 1, month: -1 });
+salaryRecordSchema.index({ employeeId: 1, month: 1 }, { unique: true });
 salaryRecordSchema.index({ month: -1 });
 
 module.exports = mongoose.model("SalaryRecord", salaryRecordSchema);

@@ -34,17 +34,56 @@ export interface LeaveRequest {
   appliedOn: string;
 }
 
+export type PayrollStatus = 'pending' | 'partial' | 'paid';
+export type SalaryPaymentType = 'salary' | 'advance';
+
+export interface SalaryPayment {
+  id: string;
+  employeeId: string;
+  employeeName?: string;
+  employeeRole?: string;
+  employeeCode?: string;
+  amount: number;
+  type: SalaryPaymentType;
+  forMonth: string;
+  paidOn: string;
+  note?: string;
+}
+
 export interface SalaryRecord {
   id: string;
   employeeId: string;
+  employeeName?: string;
+  employeeRole?: string;
+  employeeCode?: string;
   month: string;
   baseSalary: number;
   bonus: number;
   deductions: number;
   lateFines: number;
   netSalary: number;
-  status: 'pending' | 'paid';
+  paidAmount?: number;
+  remaining?: number;
+  extraPaid?: number;
+  advanceGiven?: number;
+  advanceCredit?: number;
+  advanceDetails?: { forMonth: string; amount: number }[];
+  arrears?: number;
+  status: PayrollStatus;
   paidOn?: string;
+}
+
+export interface PayrollSummary {
+  due: number;
+  paid: number;
+  remaining: number;
+  advances: number;
+  arrears: number;
+}
+
+export interface SalaryHistoryResponse {
+  items: SalaryRecord[];
+  payments: SalaryPayment[];
 }
 
 export interface LeaveBalance {

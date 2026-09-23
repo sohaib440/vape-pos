@@ -66,7 +66,7 @@ The heart of cashier interaction.
 | **Orders & Checkout** | `orderController.js` | Status shifting, KOT generation, Receipt logic, Table lifecycle locks, Staff assignment & payment tracking. |
 | **Tax & Govt. Logs** | `fbrController.json` & `taxController` | Integrates required FBR tracking logic alongside local taxation math. |
 | **Printers & Tracking** | `printerController.js` | Directs POS and KOT printing tasks locally to hardware. |
-| **Inventory & Staffing** | `inventoryController.js` / `hrController.js` | Logs deductions per-item sold, maps attendance records per shift, Employee CRUD with delete. |
+| **Inventory & Staffing** | `inventoryController.js` / `hrController.js` | Logs deductions per-item sold, maps attendance and leave, Employee CRUD (soft-delete to inactive), monthly payroll with salary payments and advances. |
 
 ---
 
@@ -185,7 +185,8 @@ const StaffBills = lazy(() => import("./pages/staff-bills/index.tsx"));
 - **Role** changed from free text input to **dropdown** with 13 options: Waiter, Chef, Head Chef, Sous Chef, Line Cook, Host, Manager, Assistant Manager, Cashier, Bartender, Busser, Delivery, Supervisor
 - Photo upload marked as **Optional** with "Remove" button when selected
 - Required fields marked with red asterisk `*` (Name, Role)
-- Delete button added to each employee card (red, with confirmation prompt)
+- Delete button added to each employee card (red, with confirmation prompt). Delete is a **soft delete** (`status: inactive`) and is blocked when the employee has unpaid staff bills.
+- The **Payroll** tab (`PayrollTab`) is the live salary ledger. See **Section 10**.
 
 #### User Management Modal (`frontend/src/pages/hr/users/index.tsx`)
 - All fields labeled with red asterisk `*` for required
@@ -208,7 +209,7 @@ All React Query keys are properly invalidated per scope:
 | `inventory` / `dashboard` | All `inventory-*` keys (stock, alerts, stats, suppliers, logs, transfers, locations, transfer-categories, all) |
 | `settings` | `pos-init-data`, `dashboard-overview`, `reports-dashboard`, `analytics-dashboard` |
 | `users` | `orders-init-data`, `order-mgmt-init`, `users-list` |
-| `hr` | `hr-employees` |
+| `hr` | `hr-employees` plus the Payroll tab refetch via `usePosRealtimeScopes(['hr'])` |
 | `dashboard` (any data change) | `dashboard-overview`, `reports-dashboard`, `analytics-dashboard` |
 
 ---
@@ -251,7 +252,8 @@ Staff Bills Page Flow:
 | `frontend/src/App.tsx` | Modified | Added route and lazy import |
 | `frontend/src/pages/billing/components/BillPaymentPanel.tsx` | Modified | Added staff assignment dropdown with HR employees |
 | `frontend/src/pages/staff-bills/index.tsx` | **Created** | New Staff Bills page (2-panel layout) |
-| `frontend/src/pages/hr/index.tsx` | Modified | Labeled form, role dropdown, delete button, optional photo |
+| `frontend/src/pages/hr/index.tsx` | Modified | Labeled form, role dropdown, delete button, optional photo, Payroll tab |
+| `frontend/src/pages/hr/components/PayrollTab.tsx` | **Created** | Monthly payroll ledger (see Section 10) |
 | `frontend/src/pages/hr/users/index.tsx` | Modified | Labeled form with required indicators |
 | `frontend/src/contexts/pos/RealtimeContext.tsx` | Modified | Added all missing query key invalidations |
 
@@ -543,3 +545,194 @@ The order's `inventoryDeducted` guard prevents duplicate deductions. Making inve
 
 - Backend syntax checks passed for the transaction-enabled order controller and order model.
 - Production frontend build passed.
+
+---
+
+## 10. HR Payroll Module (2026-09-23)
+
+Monthly salary is no longer a single "mark paid" switch. Each employee has one salary row per calendar month, plus a payment ledger. Cash recorded is **what the employee receives** (net), not the printed base salary.
+
+### 10.1 Business Rules
+
+```text
+Net (take-home) = base + bonus − deduction − late fine
+```
+
+| Rule | Behavior |
+|------|----------|
+| **Start month** | Payroll tracking starts at `PAYROLL_START_MONTH = "2026-09"`. Older leftover salary rows are ignored for arrears and month seeding. |
+| **One row per month** | Unique `{ employeeId, month }` on `SalaryRecord`. Opening a month creates missing rows for active employees. |
+| **No one-click mark-paid** | Cashier enters an amount. Save writes a `SalaryPayment` and updates that month's status. |
+| **He receives the net** | Base 12,000 with a 500 late fine means he gets **11,500**. That 500 is not extra pay. Status is **paid**. Received column shows **11,500**. |
+| **Salary figure is not extra** | If type is `salary` and the typed amount equals **base** or **base + bonus** but net is lower (fine/deduction), the stored payment is **net**. Extra only if they type a cash amount above net that is not that salary figure. |
+| **Partial** | Received < net → `partial`, remaining unpaid is shown. Example: net 12,500 paid 12,000 → Rs 500 unpaid. |
+| **Paid** | Received ≥ net → `paid`. Extra cash above net stays on **that month** (not auto-advance) unless type is `advance`. |
+| **Advance** | Type `advance` plus a target month/year. Shown on the paying month as `October 2026 Rs 5,000`. Credited toward the target month's received amount. |
+| **Arrears** | Unpaid net from months `>= 2026-09` and `<` the viewing month. Pre-module history is not counted. |
+| **Staff name** | Salary APIs attach `employeeName`, `employeeRole`, `employeeCode` so the table does not depend on a client-side employee join. |
+
+### 10.2 Models
+
+#### `SalaryRecord` (`backend/models/salaryRecord.js`)
+
+```javascript
+{
+  employeeId: String,          // Employee._id as string
+  month: "YYYY-MM",
+  baseSalary: Number,
+  bonus: Number,
+  deductions: Number,
+  lateFines: Number,
+  netSalary: Number,           // stored; live APIs recompute via computeNet
+  status: "pending" | "partial" | "paid",
+  paidOn: String
+}
+// unique index: { employeeId: 1, month: 1 }
+```
+
+#### `SalaryPayment` (`backend/models/salaryPayment.js`)
+
+```javascript
+{
+  employeeId: String,
+  amount: Number,              // cash he received (net when paying the salary figure)
+  type: "salary" | "advance",
+  forMonth: "YYYY-MM",         // month this cash applies to
+  paidOn: "YYYY-MM-DD",
+  note: String
+}
+```
+
+Registered in `backend/models/index.js` as `SalaryRecord` and `SalaryPayment`.
+
+### 10.3 API Endpoints (`backend/routes/hr.routes.js`)
+
+`GET /salary/payments` is registered **before** `GET /salary/:employeeId/history` so `payments` is not parsed as an employee id.
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `GET` | `/hr/salary?month=YYYY-MM` | Month rows + summary. Seeds missing active-employee rows from Sept 2026 onward. |
+| `GET` | `/hr/salary/payments?employeeId=` | Payment ledger (optional one-employee filter). |
+| `GET` | `/hr/salary/:employeeId/history` | That employee's month rows + all payments. |
+| `PATCH` | `/hr/salary/:employeeId` | Adjust bonus / deduction / late for a month (no cash). |
+| `POST` | `/hr/salary/:employeeId/payments` | Save adjustments and/or record cash. |
+| `PATCH` | `/hr/salary/:employeeId/mark-paid` | Legacy leftover: pays remaining net in full. UI does not use this as the primary action. |
+
+#### `POST /hr/salary/:employeeId/payments` body
+
+```json
+{
+  "amount": 11500,
+  "type": "salary",
+  "month": "2026-09",
+  "forMonth": "2026-09",
+  "note": "",
+  "baseSalary": 12000,
+  "bonus": 0,
+  "deductions": 0,
+  "lateFines": 500
+}
+```
+
+- `type: "advance"` uses `forMonth` as the future month the advance is for.
+- After adjustments are saved, `cashHeReceives()` may rewrite `amount` from 12,000 → 11,500 when the typed figure is the base/bonus salary and net is lower.
+- Status is recomputed from all payments toward `forMonth` vs live net.
+
+#### Month list item (decorated)
+
+```json
+{
+  "id": "salaryRecordId",
+  "employeeId": "employeeMongoId",
+  "employeeName": "ali",
+  "employeeRole": "Cashier",
+  "employeeCode": "EMP-001",
+  "month": "2026-09",
+  "baseSalary": 12000,
+  "bonus": 0,
+  "deductions": 0,
+  "lateFines": 500,
+  "netSalary": 11500,
+  "paidAmount": 11500,
+  "remaining": 0,
+  "extraPaid": 0,
+  "advanceGiven": 0,
+  "advanceCredit": 0,
+  "advanceDetails": [{ "forMonth": "2026-10", "amount": 5000 }],
+  "arrears": 0,
+  "status": "paid"
+}
+```
+
+#### Month summary
+
+```json
+{ "due": 0, "paid": 0, "remaining": 0, "advances": 0, "arrears": 0 }
+```
+
+### 10.4 Frontend
+
+**Files**
+- `frontend/src/pages/hr/components/PayrollTab.tsx` — ledger UI
+- `frontend/src/pages/hr/index.tsx` — mounts `<PayrollTab employees={employees} />` on the Payroll tab
+- `frontend/src/data/hr/hrData.ts` — `SalaryRecord`, `SalaryPayment`, `PayrollSummary`, `SalaryHistoryResponse`
+
+**Views**
+- **Payment history** (default): every cash row — paid on, name, type, for month, amount, note, per-employee History filter.
+- **This month**: one row per employee for the selected month.
+
+**This month columns**
+
+| Column | Shows |
+|--------|--------|
+| Name | `employeeName` (fallback client lookup by `id` / `_id` / `employeeId`) and role |
+| Original salary | Base, plus **To pay** = live net (`base + bonus − deduction − late`) |
+| Deduction | Deduction or dash |
+| Received | Cash toward that month; unpaid remainder if any |
+| Bonus / Extra | Bonus line; Extra only if cash > net |
+| Late | Late fine or dash |
+| Advance | `Month Year Rs amount` for advances paid in the viewing month; or credit already on this month |
+| Status | Received / Partial · Rs unpaid / Not received |
+| Actions | **Pay** (form) and **History** (that employee only) |
+
+**Pay form**
+- Salary type: Monthly salary or Advance
+- **Amount he receives** auto-fills to remaining net when base/bonus/deduction/late change
+- Base, bonus, deduction, late
+- Month and year as **two separate selects** (not a combined month key)
+- Optional note
+- Banner uses the same take-home math: after save, base 12,000 + late 500 → he receives 11,500 and the month is marked paid
+
+Live preview and the table both compute net on the client so a stale stored `netSalary` of 12,000 cannot hide a 12,500 due or a 500 unpaid.
+
+### 10.5 Worked Examples
+
+| Inputs | He receives | Extra | Status |
+|--------|-------------|-------|--------|
+| Base 12,000, late 500, typed amount 12,000 | **11,500** | none | **Paid** |
+| Base 12,000, bonus 2,000, deduct 1,000, late 500, paid 12,000 | 12,000 | none | **Partial · Rs 500 unpaid** (net 12,500) |
+| Base 12,000, late 500, typed amount 13,000 | 13,000 | 1,500 | Paid + extra on September |
+| Type advance, for October, amount 5,000 | 5,000 toward October | — | September Advance column: `October 2026 Rs 5,000` |
+
+### 10.6 Files Summary
+
+| File | Action | Description |
+|------|--------|-------------|
+| `backend/models/salaryRecord.js` | Updated | Status `pending \| partial \| paid`; unique `employeeId + month` |
+| `backend/models/salaryPayment.js` | **Created** | Cash ledger: type, forMonth, paidOn, amount |
+| `backend/models/index.js` | Modified | Exports `SalaryPayment` |
+| `backend/controllers/hrController.js` | Modified | Month seed from 2026-09, decorate + staff names, `cashHeReceives`, payment/history APIs |
+| `backend/routes/hr.routes.js` | Modified | Salary list, payments, history, patch, mark-paid |
+| `frontend/src/data/hr/hrData.ts` | Modified | Payroll types, staff name fields, advance details |
+| `frontend/src/pages/hr/components/PayrollTab.tsx` | **Created** | History + month table + pay form |
+| `frontend/src/pages/hr/index.tsx` | Modified | Payroll tab uses `PayrollTab` |
+
+### 10.7 Design Decisions
+
+1. **Net is take-home.** Fines and deductions reduce what he gets. They do not create "extra" when the cashier types the old base figure.
+2. **Amount field means cash received**, defaulted to remaining net. Label: "Amount he receives".
+3. **Advance is explicit.** Extra on a monthly-salary pay stays on that month; it does not become next month's advance unless type is Advance.
+4. **History is the main ledger.** This month is for recording a new pay.
+5. **Names come from the salary API** so Unknown staff / raw ObjectIds do not appear when the parent employee list is empty or ids differ.
+6. **Module starts now.** Prior arrears from leftover rows before September 2026 are excluded.
+7. **Soft-delete employees** stay resolvable on old payroll rows because salary APIs load all employees, not only active.
