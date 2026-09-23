@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Users, Calendar, DollarSign, Clock, UserPlus, FileText, Award, CheckCircle, XCircle, Search, Timer, Pencil, Trash2, X } from 'lucide-react';
+import { Users, Calendar, DollarSign, Clock, UserPlus, FileText, CheckCircle, XCircle, Search, Timer, Pencil, Trash2 } from 'lucide-react';
 import {
   type Employee,
   type AttendanceRecord,
   type LeaveRequest,
   type LeaveBalance,
-  type SalaryRecord,
   type ShiftBlock,
 } from '@/data/hr/hrData';
 import { toast } from 'sonner';
 import { api, getBackendOrigin } from '@/lib/api/api';
 import { usePosRealtimeScopes } from '@/hooks/pos/use-pos-realtime';
+import { PayrollTab } from './components/PayrollTab';
 
 type Tab = 'employees' | 'attendance' | 'shifts' | 'leaves' | 'salary';
 
@@ -20,14 +20,9 @@ export default function HRManagement() {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([]);
-  const [salaryRecords, setSalaryRecords] = useState<SalaryRecord[]>([]);
   const [shifts, setShifts] = useState<ShiftBlock[]>([]);
   const [search, setSearch] = useState('');
   const [showAddEmployee, setShowAddEmployee] = useState(false);
-  const [showSalaryAdjust, setShowSalaryAdjust] = useState<string | null>(null);
-  const [adjustBonus, setAdjustBonus] = useState('');
-  const [adjustDeduction, setAdjustDeduction] = useState('');
-  const [adjustLateFine, setAdjustLateFine] = useState('');
 
   const loadHrData = useCallback(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -36,15 +31,13 @@ export default function HRManagement() {
       api<{ items: AttendanceRecord[] }>(`/hr/attendance?date=${today}`),
       api<{ items: LeaveRequest[] }>('/hr/leaves'),
       api<{ items: LeaveBalance[] }>('/hr/leave-balances'),
-      api<{ items: SalaryRecord[] }>('/hr/salary'),
       api<{ items: ShiftBlock[] }>('/hr/shifts'),
     ])
-      .then(([employeesRes, attendanceRes, leavesRes, balancesRes, salaryRes, shiftsRes]) => {
+      .then(([employeesRes, attendanceRes, leavesRes, balancesRes, shiftsRes]) => {
         setEmployees(employeesRes.items);
         setAttendance(attendanceRes.items);
         setLeaveRequests(leavesRes.items);
         setLeaveBalances(balancesRes.items);
-        setSalaryRecords(salaryRes.items);
         setShifts(shiftsRes.items);
       })
       .catch(() => toast.error('Failed to load HR data'));
@@ -142,31 +135,6 @@ export default function HRManagement() {
         toast.success(`Leave request ${action}`);
       })
       .catch(() => toast.error('Failed to update leave request'));
-  };
-
-  const handleSalaryAdjust = (empId: string) => {
-    const bonus = parseInt(adjustBonus) || 0;
-    const deductions = parseInt(adjustDeduction) || 0;
-    const lateFines = parseInt(adjustLateFine) || 0;
-    api(`/hr/salary/${empId}`, { method: 'PATCH', body: JSON.stringify({ bonus, deductions, lateFines }) })
-      .then(() => {
-        setSalaryRecords(prev => prev.map(s => s.employeeId === empId ? { ...s, bonus, deductions, lateFines, netSalary: s.baseSalary + bonus - deductions - lateFines } : s));
-        toast.success('Salary adjustments saved');
-      })
-      .catch(() => toast.error('Failed to adjust salary'));
-    setShowSalaryAdjust(null);
-    setAdjustBonus('');
-    setAdjustDeduction('');
-    setAdjustLateFine('');
-  };
-
-  const handleMarkPaid = (empId: string) => {
-    api(`/hr/salary/${empId}/mark-paid`, { method: 'PATCH' })
-      .then(() => {
-        setSalaryRecords(prev => prev.map(s => s.employeeId === empId ? { ...s, status: 'paid', paidOn: new Date().toISOString().split('T')[0] } : s));
-        toast.success('Salary marked as paid');
-      })
-      .catch(() => toast.error('Failed to mark salary paid'));
   };
 
   const filteredEmployees = employees.filter(e => {
@@ -411,65 +379,7 @@ export default function HRManagement() {
         </div>
       )}
 
-      {/* Salary Tab */}
-      {tab === 'salary' && (
-        <div className="bg-card rounded-2xl border border-border overflow-hidden">
-          <div className="p-4 border-b border-border">
-            <h3 className="font-semibold text-foreground">Monthly Payroll — {new Date().toLocaleDateString('en', { month: 'long', year: 'numeric' })}</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Employee</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Base</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Bonus</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Deductions</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Late Fines</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Net Salary</th>
-                  <th className="text-center px-4 py-3 font-medium text-muted-foreground">Status</th>
-                  <th className="text-center px-4 py-3 font-medium text-muted-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {salaryRecords.map(s => {
-                  const emp = getEmployee(s.employeeId);
-                  if (!emp) return null;
-                  return (
-                    <tr key={s.id} className="border-b border-border/50">
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-foreground">{emp.name}</p>
-                        <p className="text-xs text-muted-foreground">{emp.role}</p>
-                      </td>
-                      <td className="px-4 py-3 text-right text-muted-foreground">Rs {s.baseSalary.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right text-primary font-medium">{s.bonus > 0 ? `+${s.bonus.toLocaleString()}` : '—'}</td>
-                      <td className="px-4 py-3 text-right text-destructive font-medium">{s.deductions > 0 ? `-${s.deductions.toLocaleString()}` : '—'}</td>
-                      <td className="px-4 py-3 text-right text-warning font-medium">{s.lateFines > 0 ? `-${s.lateFines.toLocaleString()}` : '—'}</td>
-                      <td className="px-4 py-3 text-right font-bold text-foreground">Rs {s.netSalary.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.status === 'paid' ? 'bg-primary/10 text-primary' : 'bg-warning/10 text-warning'}`}>{s.status}</span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => { setShowSalaryAdjust(s.employeeId); setAdjustBonus(String(s.bonus || '')); setAdjustDeduction(String(s.deductions || '')); setAdjustLateFine(String(s.lateFines || '')); }} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground" title="Adjust"><Award className="w-3.5 h-3.5" /></button>
-                          {s.status === 'pending' && (
-                            <button onClick={() => handleMarkPaid(s.employeeId)} className="p-1.5 rounded-lg hover:bg-primary/10 text-primary" title="Mark Paid"><CheckCircle className="w-3.5 h-3.5" /></button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-                <tr className="bg-muted/50">
-                  <td className="px-4 py-3 font-bold text-foreground" colSpan={5}>Total Payroll</td>
-                  <td className="px-4 py-3 text-right font-bold text-foreground">Rs {totalSalary.toLocaleString()}</td>
-                  <td colSpan={2}></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {tab === 'salary' && <PayrollTab employees={employees} />}
 
       {/* Add Employee Modal */}
       {showAddEmployee && (
@@ -573,35 +483,6 @@ export default function HRManagement() {
         </div>
       )}
 
-      {/* Salary Adjust Modal */}
-      {showSalaryAdjust && (
-        <div className="fixed inset-0 bg-foreground/30 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-2xl p-6 w-full max-w-sm space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="font-serif text-lg font-bold text-foreground">Adjust Salary — {getEmployee(showSalaryAdjust)?.name}</h3>
-              <button type="button" onClick={() => setShowSalaryAdjust(null)} className="rounded-full p-1 text-muted-foreground hover:bg-muted" aria-label="Close salary adjust">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Bonus (Rs)</label>
-              <input type="number" value={adjustBonus} onChange={e => setAdjustBonus(e.target.value)} placeholder="0" className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm mt-1" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Deductions (Rs)</label>
-              <input type="number" value={adjustDeduction} onChange={e => setAdjustDeduction(e.target.value)} placeholder="0" className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm mt-1" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Late Fines (Rs)</label>
-              <input type="number" value={adjustLateFine} onChange={e => setAdjustLateFine(e.target.value)} placeholder="0" className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm mt-1" />
-            </div>
-            <div className="flex gap-2 pt-2">
-              <button onClick={() => setShowSalaryAdjust(null)} className="flex-1 py-2 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-muted">Cancel</button>
-              <button onClick={() => handleSalaryAdjust(showSalaryAdjust)} className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-secondary">Save</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

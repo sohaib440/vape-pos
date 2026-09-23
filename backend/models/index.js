@@ -13,6 +13,7 @@ module.exports = {
   LeaveRequest: require("./leaveRequest"),
   LeaveBalance: require("./leaveBalance"),
   SalaryRecord: require("./salaryRecord"),
+  SalaryPayment: require("./salaryPayment"),
   Shift: require("./shift"),
   Floor: require("./floor"),
   Table: require("./table"),
