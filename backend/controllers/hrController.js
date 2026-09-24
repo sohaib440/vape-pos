@@ -53,6 +53,14 @@ const staffMap = (employees) => {
   return map;
 };
 
+// Soft-deleted (inactive) and missing employees must never appear in payroll lists.
+const isActiveEmployee = (emp) => Boolean(emp) && emp.status !== "inactive";
+
+const activeEmployeesById = async () => {
+  const employees = await Employee.find({ status: { $ne: "inactive" } }).lean();
+  return staffMap(employees);
+};
+
 const staffFields = (employeeId, employeesById) => {
   const emp = employeesById.get(String(employeeId || ""));
   return {
@@ -221,10 +229,11 @@ exports.listLeaveBalances = async (_req, res) => {
 exports.listSalary = async (req, res) => {
   const month = String(req.query.month || currentMonthKey());
   await ensureMonthRecords(month);
-  const rows = await SalaryRecord.find({ month }).lean();
+  const employeesById = await activeEmployeesById();
+  const allRows = await SalaryRecord.find({ month }).lean();
+  // Hide orphan rows and soft-deleted employees from the payroll table.
+  const rows = allRows.filter((row) => isActiveEmployee(employeesById.get(String(row.employeeId || ""))));
   const employeeIds = [...new Set(rows.map((row) => String(row.employeeId)))];
-  const employees = await Employee.find({}).lean();
-  const employeesById = staffMap(employees);
   const payments = await SalaryPayment.find({ employeeId: { $in: employeeIds } }).sort({ paidOn: 1, createdAt: 1 }).lean();
   const paymentsByEmployee = new Map();
   payments.forEach((payment) => {
@@ -261,8 +270,10 @@ exports.listSalary = async (req, res) => {
 };
 
 exports.patchSalary = async (req, res) => {
-  const month = String(req.body.month || req.query.month || currentMonthKey());
+  const month = String(req.body.month || currentMonthKey());
   await ensureMonthRecords(month);
+  const employee = await Employee.findById(req.params.employeeId).lean();
+  if (!isActiveEmployee(employee)) return res.status(404).json({ message: "Employee not found" });
   const row = await SalaryRecord.findOne({ employeeId: req.params.employeeId, month });
   if (!row) return res.status(404).json({ message: "Salary row not found for this month" });
   if (req.body.bonus !== undefined) row.bonus = Number(req.body.bonus || 0);
@@ -284,6 +295,7 @@ exports.recordSalaryPayment = async (req, res) => {
   }
   const employee = await Employee.findById(employeeId).lean();
   if (!employee) return res.status(404).json({ message: "Employee not found" });
+  if (!isActiveEmployee(employee)) return res.status(400).json({ message: "Employee is inactive" });
 
   const paidOn = String(req.body.paidOn || new Date().toISOString().slice(0, 10));
   const selectedMonth = String(req.body.month || currentMonthKey());
@@ -327,8 +339,11 @@ exports.recordSalaryPayment = async (req, res) => {
 
 exports.markSalaryPaid = async (req, res) => {
   const employeeId = String(req.params.employeeId);
-  const month = String(req.body.month || req.query.month || currentMonthKey());
+  const month = String(req.body.month || currentMonthKey());
   await ensureMonthRecords(month);
+  const employee = await Employee.findById(employeeId).lean();
+  if (!employee) return res.status(404).json({ message: "Employee not found" });
+  if (!isActiveEmployee(employee)) return res.status(400).json({ message: "Employee is inactive" });
   const row = await SalaryRecord.findOne({ employeeId, month });
   if (!row) return res.status(404).json({ message: "Salary row not found for this month" });
   const payments = await SalaryPayment.find({ employeeId, forMonth: month }).lean();
@@ -359,9 +374,9 @@ exports.listSalaryPayments = async (req, res) => {
     if (req.query.from) where.paidOn.$gte = String(req.query.from);
     if (req.query.to) where.paidOn.$lte = String(req.query.to);
   }
-  const rows = await SalaryPayment.find(where).sort({ paidOn: -1, createdAt: -1 }).lean();
-  const employees = await Employee.find({}).lean();
-  const employeesById = staffMap(employees);
+  const employeesById = await activeEmployeesById();
+  const rows = (await SalaryPayment.find(where).sort({ paidOn: -1, createdAt: -1 }).lean())
+    .filter((row) => isActiveEmployee(employeesById.get(String(row.employeeId || ""))));
   res.json({
     items: rows.map((row) => ({
       ...row,
@@ -373,12 +388,15 @@ exports.listSalaryPayments = async (req, res) => {
 
 exports.listSalaryHistory = async (req, res) => {
   const employeeId = String(req.params.employeeId);
-  const [records, payments, employees] = await Promise.all([
+  const employeesById = await activeEmployeesById();
+  const employee = employeesById.get(employeeId);
+  if (!isActiveEmployee(employee)) {
+    return res.status(404).json({ message: "Employee not found" });
+  }
+  const [records, payments] = await Promise.all([
     SalaryRecord.find({ employeeId }).sort({ month: -1 }).lean(),
     SalaryPayment.find({ employeeId }).sort({ paidOn: -1, createdAt: -1 }).lean(),
-    Employee.find({}).lean(),
   ]);
-  const employeesById = staffMap(employees);
   res.json({
     items: records.map((row) => decorateRecord(row, payments, employeesById)),
     payments: payments.map((row) => ({ ...row, id: String(row._id), ...staffFields(row.employeeId, employeesById) })),
