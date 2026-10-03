@@ -18,13 +18,6 @@ import { cn } from '@/lib/common/utils';
 // New sub-components
 import { BillList } from './components/BillList';
 import { BillPaymentPanel } from './components/BillPaymentPanel';
-import {
-  DUMMY_BILL_CASHIERS,
-  DUMMY_BILL_FLOORS,
-  DUMMY_BILL_TABLES,
-  filterDummyBills,
-  getDummyBills,
-} from './dummyBills';
 
 export default function Billing() {
   const { isLocked, runLocked } = useSubmitLock();
@@ -42,7 +35,6 @@ export default function Billing() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [usingDummyBills, setUsingDummyBills] = useState(false);
   const [taxRates, setTaxRates] = useState({ gstRate: 0.16, serviceChargeRate: 0.05, takeawayChargeRate: 0.05, minimumOrderAmount: 0 });
   const [printedOrderIds, setPrintedOrderIds] = useState<Set<string>>(new Set());
 
@@ -110,44 +102,6 @@ export default function Billing() {
     return 'bg-warning/15 text-warning border-warning/30';
   };
 
-  const sortBills = (list: (Order & { dbId?: string; printed?: boolean })[]) =>
-    [...list].sort((a, b) => {
-      const isReady = (o: Order & { printed?: boolean }) =>
-        ['ready', 'served', 'taken away'].includes(o.status || '') || o.printed || isOrderPrinted(o.id);
-      const getPrio = (o: Order & { printed?: boolean }) =>
-        o.status === 'completed' ? 3 : isReady(o) ? 1 : 2;
-      const pA = getPrio(a);
-      const pB = getPrio(b);
-      if (pA !== pB) return pA - pB;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-
-  const applyDummyBills = () => {
-    const dummyTableMap = new Map<number, TableInfo>();
-    DUMMY_BILL_TABLES.forEach((t) => dummyTableMap.set(t.id, t));
-    tables.forEach((t) => dummyTableMap.set(t.id, t));
-
-    const filtered = filterDummyBills(getDummyBills(currentUser?.name), {
-      startDate,
-      endDate,
-      selectedFloor,
-      selectedOrderType,
-      selectedCashier,
-      showMyBillsOnly,
-      currentUserName: currentUser?.name,
-      search: debouncedTableSearch,
-      tableMap: dummyTableMap,
-    }).map((o) => ({ ...o, printed: o.printed || isOrderPrinted(o.id) }));
-
-    setUsingDummyBills(true);
-    setHasMore(false);
-    setOrders(sortBills(filtered));
-    setSelectedOrder((prev) => {
-      if (!prev) return null;
-      return filtered.find((a) => a.id === prev.id) || null;
-    });
-  };
-
   const loadOrders = (pageNum = 1, append = false) => {
     setLoading(true);
     const params = new URLSearchParams({
@@ -171,75 +125,59 @@ export default function Billing() {
       params.append('orderTaker', selectedCashier);
     }
 
-    return api<PaginatedResponse<Order & { dbId: string }>>(`/orders?${params.toString()}`)
-      .then((r) => {
-        const filteredResult = r.items.filter((o) => o.status !== 'cancelled');
-        const ordersWithPrinted = filteredResult.map((o) => ({ ...o, printed: isOrderPrinted(o.id) }));
+    return api<PaginatedResponse<Order & { dbId: string }>>(`/orders?${params.toString()}`).then(r => {
+      const filteredResult = r.items.filter(o => o.status !== 'cancelled');
+      const ordersWithPrinted = filteredResult.map(o => ({ ...o, printed: isOrderPrinted(o.id) }));
 
-        // When API has nothing for this filter set, show demo bills so mobile UI can be tested
-        if (!append && ordersWithPrinted.length === 0) {
-          applyDummyBills();
-          return;
-        }
-
-        setUsingDummyBills(false);
-        setOrders((prev) => sortBills(append ? [...prev, ...ordersWithPrinted] : ordersWithPrinted));
-        setHasMore(r.pagination.hasNext);
-        setPage(pageNum);
-
-        setOrders((current) => {
-          setSelectedOrder((prev) => {
-            if (prev) {
-              const match = current.find((a) => a.id === prev.id);
-              if (match) return match;
-            }
-            return null;
-          });
-          return current;
+      setOrders(prev => {
+        const next = append ? [...prev, ...ordersWithPrinted] : ordersWithPrinted;
+        return next.sort((a, b) => {
+          const isReady = (o: any) => ['ready', 'served', 'taken away'].includes(o.status || '') || o.printed || isOrderPrinted(o.id);
+          const getPrio = (o: any) => o.status === 'completed' ? 3 : (isReady(o) ? 1 : 2);
+          const pA = getPrio(a);
+          const pB = getPrio(b);
+          if (pA !== pB) return pA - pB;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
-      })
-      .catch(() => {
-        if (!append) applyDummyBills();
-      })
-      .finally(() => setLoading(false));
+      });
+
+      setHasMore(r.pagination.hasNext);
+      setPage(pageNum);
+
+      setOrders(current => {
+        setSelectedOrder(prev => {
+          if (prev) {
+            const match = current.find(a => a.id === prev.id);
+            if (match) return match;
+          }
+          return null;
+        });
+        return current;
+      });
+    }).finally(() => setLoading(false));
   };
 
   const loadTables = () =>
-    api<PaginatedResponse<any>>(`/tables?page=1&limit=${MAX_LIST_LIMIT}`).then((r) => {
+    api<PaginatedResponse<any>>(`/tables?page=1&limit=${MAX_LIST_LIMIT}`).then(r => {
       const floorsList = Array.from(new Set(r.items.map((t: any) => t.floorKey).filter(Boolean)));
-      setFloors(
-        floorsList.length
-          ? floorsList.map((k: any) => ({ key: k, name: k }))
-          : DUMMY_BILL_FLOORS,
-      );
-      setTables(
-        r.items.length
-          ? r.items.map((t: any) => ({
-            id: t.number,
-            mongoId: t.id,
-            number: t.number,
-            name: t.name,
-            seats: t.seats,
-            floorId: t.floorKey,
-            status: t.status,
-            currentOrder: t.currentOrder,
-          }))
-          : DUMMY_BILL_TABLES,
-      );
-    }).catch(() => {
-      setFloors(DUMMY_BILL_FLOORS);
-      setTables(DUMMY_BILL_TABLES);
+      setFloors(floorsList.map((k: any) => ({ key: k, name: k })));
+      setTables(r.items.map((t: any) => ({
+        id: t.number,
+        mongoId: t.id,
+        number: t.number,
+        name: t.name,
+        seats: t.seats,
+        floorId: t.floorKey,
+        status: t.status,
+        currentOrder: t.currentOrder,
+      })));
     });
 
   const loadUsers = () => {
-    api<PaginatedResponse<any>>('/users?limit=100').then((r) => {
+    api<PaginatedResponse<any>>('/users?limit=100').then(r => {
       const relevant = r.items.filter((u: any) => ['cashier', 'admin'].includes(u.role));
-      setCashiers(
-        relevant.length
-          ? relevant.map((u: any) => ({ key: u.name, name: u.name }))
-          : DUMMY_BILL_CASHIERS,
-      );
-    }).catch(() => setCashiers(DUMMY_BILL_CASHIERS));
+      setCashiers(relevant.map((u: any) => ({ key: u.name, name: u.name })));
+    });
   };
 
   const loadTaxRates = useCallback(() => {
@@ -272,36 +210,11 @@ export default function Billing() {
 
   const tableMap = useMemo(() => {
     const map = new Map<number, TableInfo>();
-    const source = tables.length ? tables : DUMMY_BILL_TABLES;
-    source.forEach((t) => {
+    tables.forEach(t => {
       map.set(t.id, t);
     });
-    // Ensure dummy table names resolve when demo bills are active alongside real tables
-    if (usingDummyBills) {
-      DUMMY_BILL_TABLES.forEach((t) => {
-        if (!map.has(t.id)) map.set(t.id, t);
-      });
-    }
     return map;
-  }, [tables, usingDummyBills]);
-
-  const displayFloors = useMemo(() => {
-    if (!usingDummyBills) return floors.length ? floors : DUMMY_BILL_FLOORS;
-    const merged = [...floors];
-    DUMMY_BILL_FLOORS.forEach((f) => {
-      if (!merged.some((x) => x.key === f.key)) merged.push(f);
-    });
-    return merged.length ? merged : DUMMY_BILL_FLOORS;
-  }, [floors, usingDummyBills]);
-
-  const displayCashiers = useMemo(() => {
-    if (!usingDummyBills) return cashiers.length ? cashiers : DUMMY_BILL_CASHIERS;
-    const merged = [...cashiers];
-    DUMMY_BILL_CASHIERS.forEach((c) => {
-      if (!merged.some((x) => x.key === c.key)) merged.push(c);
-    });
-    return merged.length ? merged : DUMMY_BILL_CASHIERS;
-  }, [cashiers, usingDummyBills]);
+  }, [tables]);
 
   const filteredOrders = useMemo(() => {
     if (billingStatusFilter === 'all') return orders;
@@ -343,10 +256,10 @@ export default function Billing() {
           searchQuery={tableSearchQuery}
           onSearchChange={setTableSearchQuery}
           searchPlaceholder="Search table number or ID..."
-          floors={displayFloors}
+          floors={floors}
           selectedFloor={selectedFloor}
           onFloorChange={setSelectedFloor}
-          cashiers={displayCashiers}
+          cashiers={cashiers}
           selectedCashier={selectedCashier}
           onCashierChange={setSelectedCashier}
           startDate={startDate}
@@ -389,11 +302,6 @@ export default function Billing() {
             </div>
           }
         />
-        {usingDummyBills && (
-          <p className="mt-1.5 px-1 text-[10px] font-medium text-muted-foreground">
-            Showing demo bills for UI testing — real orders will replace these when available.
-          </p>
-        )}
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 sm:gap-5 overflow-hidden xl:grid-cols-[480px_minmax(0,1fr)]">
