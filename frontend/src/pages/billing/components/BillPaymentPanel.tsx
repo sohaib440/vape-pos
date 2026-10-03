@@ -117,7 +117,9 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
   const lastSyncedValues = useRef<string>('');
   const syncTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Reset/Update state when order changes
+  // Reset local billing UI only when switching to a different bill.
+  // Do NOT depend on order.discount / gst — sync + realtime refresh would
+  // reset the inputs mid-edit and cause a mobile refresh/glitch loop.
   useEffect(() => {
     if (!order) return;
     setGstEnabled(order.gstEnabled !== false);
@@ -139,9 +141,9 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
     setSwitchDeliveryName(order.customerName || '');
     setSwitchDeliveryPhone(order.phone || '');
     setSwitchDeliveryAddress(order.deliveryAddress || '');
-    // Reset sync tracking when order changes
     lastSyncedValues.current = '';
-  }, [order?.id, order?.gstEnabled, order?.discount, order?.takeawayChargeEnabled]);
+    setIsSyncing(false);
+  }, [order?.id]);
 
   const subtotal = useMemo(() => {
     if (!order) return 0;
@@ -201,17 +203,13 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
   useEffect(() => {
     if (!order?.dbId || order.status === 'completed') return;
 
-    // Skip if values haven't changed
     if (lastSyncedValues.current === currentSyncValues) return;
 
-    // Clear previous timeout
     if (syncTimeoutRef.current) {
       clearTimeout(syncTimeoutRef.current);
     }
 
-    // Debounce the sync
     syncTimeoutRef.current = setTimeout(() => {
-      // Update last synced values before making the call
       lastSyncedValues.current = currentSyncValues;
       setIsSyncing(true);
 
@@ -229,13 +227,14 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
           advanceAmount,
           takeawayChargeEnabled,
         }),
-      }).then(() => {
-        setIsSyncing(false);
-      }).catch((err) => {
-        console.error('Failed to sync billing totals:', err);
-        // On error, reset so we can retry
-        lastSyncedValues.current = '';
-      });
+      })
+        .catch((err) => {
+          console.error('Failed to sync billing totals:', err);
+          // Keep lastSyncedValues so we don't hammer retries on every keystroke
+        })
+        .finally(() => {
+          setIsSyncing(false);
+        });
     }, 500);
 
     return () => {
@@ -243,7 +242,7 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
         clearTimeout(syncTimeoutRef.current);
       }
     };
-  }, [order?.dbId, order?.status, currentSyncValues]); // Only depend on the stable string
+  }, [order?.dbId, order?.status, currentSyncValues]);
 
   const fmt = (v: number) => `Rs. ${v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
