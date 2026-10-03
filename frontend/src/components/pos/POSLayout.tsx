@@ -163,20 +163,19 @@ export default function POSLayout() {
 
       {/* Main */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-14 border-b border-border flex items-center justify-between px-4 shrink-0 bg-background/80 backdrop-blur-sm">
-          <div className="flex items-center">
-            <button onClick={() => setSidebarOpen(true)} className="lg:hidden mr-3 text-foreground">
+        <header className="h-14 border-b border-border flex items-center justify-between gap-3 px-4 shrink-0 bg-background/80 backdrop-blur-sm">
+          <div className="flex min-w-0 flex-1 items-center">
+            <button onClick={() => setSidebarOpen(true)} className="lg:hidden mr-3 shrink-0 text-foreground">
               <Menu className="w-5 h-5" />
             </button>
             <span className="text-xs text-muted-foreground inline-flex min-w-0 items-center gap-2">
-              <div className="inline-flex items-center gap-2 shrink-0">
-                <Logo size={22} showText={false} className="shrink-0" iconClassName="shrink-0" />
-              </div>
-              <span className="truncate font-normal">Shangreela Heights Shinwari BBQ Restaurant</span>
+              <Logo size={22} showText={false} className="shrink-0" iconClassName="shrink-0" />
+              <span className="truncate font-normal sm:hidden">Shangreela Heights</span>
+              <span className="hidden truncate font-normal sm:inline">Shangreela Heights Shinwari BBQ Restaurant</span>
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground hidden sm:inline">{user.email}</span>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="text-xs text-muted-foreground hidden md:inline">{user.email}</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-muted text-muted-foreground border border-border">
               {roleLabel(user.role)}
             </span>

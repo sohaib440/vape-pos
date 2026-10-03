@@ -54,7 +54,7 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
   const [advanceAmount, setAdvanceAmount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [paidAmount, setPaidAmount] = useState<number | string>('');
-  
+
   // Switch type UI state
   const [isSwitchingType, setIsSwitchingType] = useState(false);
   const [showSwitchTablePicker, setShowSwitchTablePicker] = useState(false);
@@ -66,7 +66,7 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
   const [employees, setEmployees] = useState<{ id: string; name: string; role: string }[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<string>('');
   const [isAssigningStaff, setIsAssigningStaff] = useState(false);
-  
+
   const posStore = usePOSStore();
 
   const loadPaymentDetails = useCallback(() => {
@@ -171,7 +171,7 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
       discountAmt,
       gstEnabled,
       taxRates,
-      { 
+      {
         applyServiceCharge: order?.type === 'dine-in',
         applyTakeawayCharge: order?.type === 'takeaway' && takeawayChargeEnabled
       }
@@ -264,7 +264,7 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
       orderDiscount,
       orderGst,
       taxRates,
-      { 
+      {
         applyServiceCharge: targetOrder.type === 'dine-in',
         applyTakeawayCharge: targetOrder.type === 'takeaway' && (targetOrder as any).takeawayChargeEnabled !== false
       }
@@ -330,7 +330,7 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
 
   const handlePrint = async () => {
     if (!order) return;
-    
+
     // 1. Print locally immediately for speed
     const data = buildReceiptData(order, false);
     printReceipt(data);
@@ -426,7 +426,7 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
     tableId?: string
   ) => {
     if (!order?.dbId) return;
-    
+
     await runLocked('switch-type', async () => {
       await api(`/orders/${order.dbId}/switch-type`, {
         method: 'PATCH',
@@ -489,7 +489,7 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
   }
 
   return (
-    <div className="pos-card flex min-h-0 flex-1 flex-col overflow-hidden shadow-sm relative print:overflow-visible bg-card border border-border">
+    <div className="pos-card !p-3 sm:!p-4 flex min-h-0 flex-1 flex-col overflow-hidden shadow-sm relative print:overflow-visible bg-card border border-border">
       <AnimatePresence mode="wait">
         <motion.div
           key={order.id}
@@ -508,7 +508,7 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
             </div>
           )}
 
-          <div className="absolute top-4 right-4 z-10">
+          <div className="absolute top-3 right-3 z-10">
             <AnimatePresence>
               {isSyncing && (
                 <motion.div
@@ -524,42 +524,52 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
             </AnimatePresence>
           </div>
 
-          <div className="mb-5 shrink-0 border-b border-border pb-4 flex justify-between items-start">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="font-black text-xl text-foreground">{order.id}</h2>
-                {order.status !== 'completed' && (
-                  <button
-                    onClick={() => setIsSwitchingType(!isSwitchingType)}
-                    className={`p-1.5 rounded-lg border transition-all ${isSwitchingType ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:bg-muted'}`}
-                    title="Switch Order Type"
-                  >
-                    <Repeat className="w-3.5 h-3.5" />
-                  </button>
-                )}
+          <div className="mb-3 sm:mb-5 shrink-0 border-b border-border pb-3 sm:pb-4 space-y-2">
+            <div className="flex items-start justify-between gap-2 min-w-0">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 min-w-0">
+                  <h2 className="font-black text-lg sm:text-xl text-foreground truncate">{order.id}</h2>
+                  {order.status !== 'completed' && (
+                    <button
+                      onClick={() => setIsSwitchingType(!isSwitchingType)}
+                      className={`p-1.5 rounded-lg border transition-all shrink-0 ${isSwitchingType ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:bg-muted'}`}
+                      title="Switch Order Type"
+                    >
+                      <Repeat className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 font-medium break-words">
+                  {formatOrderDateTime(order.createdAt)} • <span className="capitalize">{order.type}</span>
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground mb-2 mt-0.5 font-medium">{formatOrderDateTime(order.createdAt)} • <span className="capitalize">{order.type}</span></p>
+              {order.table && (
+                <div className="flex gap-1.5 items-center shrink-0">
+                  <span className="text-[10px] font-black text-muted-foreground uppercase">
+                    {tableMap.get(Number(order.table))?.floorId || 'Floor'}
+                  </span>
+                  <span className="bg-primary/20 text-primary px-2 py-0.5 rounded-md font-black text-xs sm:text-sm">
+                    {tableMap.get(Number(order.table))?.name || order.table}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
               <span className={`inline-block text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full border ${getStatusBadgeClass(order)}`}>
                 {getBillStatusLabel(order)}
               </span>
-            </div>
-            <div className="text-right flex flex-col items-end gap-1.5">
-              {order.table && (
-                <div className="flex gap-1.5 items-center">
-                  <span className="text-[10px] font-black text-muted-foreground uppercase">{tableMap.get(Number(order.table))?.floorId || "Floor"}</span>
-                  <span className="bg-primary/20 text-primary px-2 py-0.5 rounded-md font-black text-sm">{tableMap.get(Number(order.table))?.name || order.table}</span>
-                </div>
-              )}
               {order.orderTaker && (
-                <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Taken by <span className="text-foreground">{order.orderTaker}</span></p>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground">
+                  Taken by <span className="text-foreground">{order.orderTaker}</span>
+                </p>
               )}
             </div>
           </div>
 
           {/* Staff Assignment Section */}
-          <div className="mb-4 shrink-0 rounded-xl border border-border/70 p-3 bg-muted/20">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+          <div className="mb-3 sm:mb-4 shrink-0 rounded-xl border border-border/70 p-2.5 sm:p-3 bg-muted/20">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+              <div className="flex items-center gap-2 shrink-0">
                 <UserCheck className="w-4 h-4 text-primary" />
                 <span className="text-xs font-semibold text-muted-foreground">Assign to Staff</span>
               </div>
@@ -568,7 +578,7 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
                 onValueChange={(v) => handleAssignStaff(v === 'none' ? '' : v)}
                 disabled={isAssigningStaff}
               >
-                <SelectTrigger className="w-[160px] h-8 text-xs font-semibold bg-background">
+                <SelectTrigger className="w-full sm:w-[160px] h-8 text-xs font-semibold bg-background">
                   <SelectValue placeholder="None (Customer)" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-border shadow-xl max-h-[200px] overflow-y-auto">
@@ -589,7 +599,7 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto pr-1 scrollbar-thin">
-            
+
             {/* Switch Type UI */}
             {isSwitchingType && (
               <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 mb-4 space-y-3 animate-in fade-in slide-in-from-top-1">
@@ -679,19 +689,21 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
               </div>
             )}
 
-            <div className="rounded-xl border border-border/70 bg-muted/35 p-3 space-y-2 mb-4">
+            <div className="rounded-xl border border-border/70 bg-muted/35 p-2.5 sm:p-3 space-y-2 mb-3 sm:mb-4">
               <h3 className="text-xs font-semibold tracking-wide text-muted-foreground">ORDER ITEMS</h3>
               {order.items.map((item: any, i) => (
-                <div key={i} className="flex justify-between text-sm py-1 border-b border-border/40 last:border-0">
-                  <div className="flex-1">
-                    <p className="text-foreground">{item.quantity}× {item.menuItem.name}</p>
+                <div key={i} className="flex justify-between gap-3 text-sm py-1 border-b border-border/40 last:border-0">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-foreground break-words">{item.quantity}× {item.menuItem.name}</p>
                     {item.extraName && (
                       <p className="text-[11px] text-primary font-bold">
                         + {item.extraName} (Rs. {Number(item.extraPrice || 0).toLocaleString()})
                       </p>
                     )}
                   </div>
-                  <span className="font-medium text-foreground">Rs. {((Number(item.menuItem.price) + Number(item.extraPrice || 0)) * item.quantity).toLocaleString()}</span>
+                  <span className="font-medium text-foreground shrink-0 tabular-nums">
+                    Rs. {((Number(item.menuItem.price) + Number(item.extraPrice || 0)) * item.quantity).toLocaleString()}
+                  </span>
                 </div>
               ))}
             </div>
@@ -702,7 +714,7 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
                   <span>Subtotal</span>
                   <span>{fmt(subtotal)}</span>
                 </div>
-                
+
                 {discountAmt > 0 && (
                   <div className="flex justify-between text-[11px] font-bold text-emerald-600 uppercase tracking-wider">
                     <span>Discount {discountMode === 'percent' ? `(${discountValue}%)` : ''}</span>
@@ -740,7 +752,7 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
                   <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Total Bill</span>
                   <span className="text-2xl font-black text-foreground tracking-tighter leading-none">{fmt(grandTotal)}</span>
                 </div>
-                
+
                 {advanceAmount > 0 && (
                   <>
                     <div className="flex justify-between items-center text-[11px] font-bold text-primary uppercase tracking-wider mt-1">
@@ -865,64 +877,65 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
                   </div>
                 )}
 
-                <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 animate-in fade-in slide-in-from-top-1">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1">
+                <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3 sm:p-4 animate-in fade-in slide-in-from-top-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+                    <div className="min-w-0 flex-1">
                       <label className="text-[10px] uppercase font-bold text-primary mb-1 block tracking-[0.15em]">Advance Received (PKR)</label>
-                      <p className="text-[10px] text-muted-foreground/60 italic leading-none">Amount received before final billing</p>
+                      <p className="text-[10px] text-muted-foreground/60 italic leading-snug">Amount received before final billing</p>
                     </div>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="0"
-                        value={advanceAmount || ''}
-                        onChange={(e) => setAdvanceAmount(Number(e.target.value) || 0)}
-                        placeholder="0"
-                        className="w-32 bg-background border border-primary/20 rounded-xl px-3 py-2.5 text-sm font-black focus:ring-4 focus:ring-primary/10 outline-none transition-all text-right placeholder:text-muted-foreground/20"
-                      />
-                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      value={advanceAmount || ''}
+                      onChange={(e) => setAdvanceAmount(Number(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-full sm:w-32 bg-background border border-primary/20 rounded-xl px-3 py-2.5 text-sm font-black focus:ring-4 focus:ring-primary/10 outline-none transition-all text-right placeholder:text-muted-foreground/20"
+                    />
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-border/70 p-3 bg-muted/20">
-                  <label className="text-xs font-semibold text-muted-foreground mb-3 block">Payment Method</label>
-                  <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl border border-border/70 p-2.5 sm:p-3 bg-muted/20">
+                  <label className="text-xs font-semibold text-muted-foreground mb-2 sm:mb-3 block">Payment Method</label>
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                     <button
                       type="button"
                       onClick={() => setPaymentMethod('cash')}
-                      className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-xs font-bold transition-all ${paymentMethod === 'cash'
-                          ? 'bg-primary text-primary-foreground border-primary shadow-md scale-[1.02]'
-                          : 'bg-card text-muted-foreground border-border hover:border-primary/30 hover:bg-primary/5'
+                      className={`inline-flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-xl border px-1.5 sm:px-3 py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold transition-all ${paymentMethod === 'cash'
+                        ? 'bg-primary text-primary-foreground border-primary shadow-md scale-[1.02]'
+                        : 'bg-card text-muted-foreground border-border hover:border-primary/30 hover:bg-primary/5'
                         }`}
                     >
-                      <Banknote className="w-4 h-4" /> Cash
+                      <Banknote className="w-4 h-4 shrink-0" />
+                      <span>Cash</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setPaymentMethod('card')}
-                      className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-xs font-bold transition-all ${paymentMethod === 'card'
-                          ? 'bg-primary text-primary-foreground border-primary shadow-md scale-[1.02]'
-                          : 'bg-card text-muted-foreground border-border hover:border-primary/30 hover:bg-primary/5'
+                      className={`inline-flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-xl border px-1.5 sm:px-3 py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold transition-all ${paymentMethod === 'card'
+                        ? 'bg-primary text-primary-foreground border-primary shadow-md scale-[1.02]'
+                        : 'bg-card text-muted-foreground border-border hover:border-primary/30 hover:bg-primary/5'
                         }`}
                     >
-                      <CreditCard className="w-4 h-4" /> Card
+                      <CreditCard className="w-4 h-4 shrink-0" />
+                      <span>Card</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setPaymentMethod('easypesa')}
-                      className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-xs font-bold transition-all ${paymentMethod === 'easypesa'
-                          ? 'bg-primary text-primary-foreground border-primary shadow-md scale-[1.02]'
-                          : 'bg-card text-muted-foreground border-border hover:border-primary/30 hover:bg-primary/5'
+                      className={`inline-flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-xl border px-1.5 sm:px-3 py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold transition-all ${paymentMethod === 'easypesa'
+                        ? 'bg-primary text-primary-foreground border-primary shadow-md scale-[1.02]'
+                        : 'bg-card text-muted-foreground border-border hover:border-primary/30 hover:bg-primary/5'
                         }`}
                     >
-                      <Wallet className="w-4 h-4" /> e-Wallet
+                      <Wallet className="w-4 h-4 shrink-0" />
+                      <span>e-Wallet</span>
                     </button>
                   </div>
                 </div>
 
                 {paymentMethod === 'cash' && (
-                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 animate-in fade-in slide-in-from-top-1">
-                    <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 sm:p-4 animate-in fade-in slide-in-from-top-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <div>
                         <label className="text-[10px] uppercase font-bold text-primary mb-1.5 block tracking-wider">Amount Received</label>
                         <input
@@ -965,28 +978,32 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
             )}
           </div>
 
-          <div className="mt-6 flex flex-col gap-2 shrink-0 border-t border-border pt-5">
-            <div className="flex gap-2">
-              {hasAction('delete_order') && order.status !== 'completed' && (
-                <button
-                  onClick={handleVoidOrder}
-                  disabled={isLocked('void-order')}
-                  className="flex-1 py-3.5 rounded-2xl bg-destructive/10 text-destructive text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-destructive hover:text-white transition-all active:scale-[0.98]"
-                >
-                  <Trash2 className="w-4 h-4" /> Delete Bill
-                </button>
-              )}
+          <div className="mt-3 sm:mt-6 flex flex-col gap-2 shrink-0 border-t border-border pt-3 sm:pt-5">
+            <div className="flex flex-col-reverse sm:flex-row gap-2">
+              <div className="grid grid-cols-2 sm:contents gap-2">
+                {hasAction('delete_order') && order.status !== 'completed' && (
+                  <button
+                    onClick={handleVoidOrder}
+                    disabled={isLocked('void-order')}
+                    className="py-3 sm:py-3.5 rounded-2xl bg-destructive/10 text-destructive text-[10px] sm:text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 sm:gap-2 hover:bg-destructive hover:text-white transition-all active:scale-[0.98] sm:flex-1"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                    <span className="truncate">Delete</span>
+                  </button>
+                )}
 
-              <button
-                onClick={handlePrint}
-                className="flex-1 py-3.5 rounded-2xl bg-muted text-muted-foreground text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-muted/80 transition-all active:scale-[0.98]"
-              >
-                <Printer className="w-4 h-4" /> Print Bill
-              </button>
+                <button
+                  onClick={handlePrint}
+                  className={`py-3 sm:py-3.5 rounded-2xl bg-muted text-muted-foreground text-[10px] sm:text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 sm:gap-2 hover:bg-muted/80 transition-all active:scale-[0.98] sm:flex-1 ${!(hasAction('delete_order') && order.status !== 'completed') ? 'col-span-2' : ''}`}
+                >
+                  <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                  <span className="truncate">Print</span>
+                </button>
+              </div>
               <button
                 onClick={handleCompletePayment}
                 disabled={isLocked('complete-payment')}
-                className="flex-[2] py-3.5 rounded-2xl bg-primary text-primary-foreground text-xs font-bold uppercase tracking-wider hover:bg-secondary transition-all shadow-lg shadow-primary/20 disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98]"
+                className="w-full sm:flex-[2] py-3 sm:py-3.5 rounded-2xl bg-primary text-primary-foreground text-[10px] sm:text-xs font-bold uppercase tracking-wider hover:bg-secondary transition-all shadow-lg shadow-primary/20 disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98]"
               >
                 {order.status === 'completed' ? 'Reprint Paid' : 'Complete Payment'}
               </button>
@@ -1004,8 +1021,8 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
                 <h2 className="text-sm font-black text-foreground uppercase tracking-widest">Select Dine-in Table</h2>
                 <p className="text-[10px] text-muted-foreground font-bold mt-0.5">FOR SWITCHING ORDER {order.id}</p>
               </div>
-              <button 
-                onClick={() => setShowSwitchTablePicker(false)} 
+              <button
+                onClick={() => setShowSwitchTablePicker(false)}
                 className="p-2 hover:bg-muted rounded-full transition-colors"
               >
                 <XIcon className="w-5 h-5 text-muted-foreground" />
@@ -1027,7 +1044,7 @@ export const BillPaymentPanel: React.FC<BillPaymentPanelProps> = ({
             </div>
 
             <div className="p-4 bg-muted/30 border-t border-border flex justify-end shrink-0 gap-3">
-              <button 
+              <button
                 onClick={() => setShowSwitchTablePicker(false)}
                 className="px-6 py-2.5 bg-card border border-border text-foreground rounded-xl hover:bg-muted transition-all text-[10px] font-black uppercase tracking-widest"
               >
